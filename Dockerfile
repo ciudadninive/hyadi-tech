@@ -1,11 +1,15 @@
 FROM wordpress:latest
 
-# 1. Aplicamos el parche de Apache durante la construcción de la imagen
-RUN a2dismod mpm_event mpm_worker || true \
-    && a2enmod mpm_prefork || true
-
-# 2. Copiamos tu carpeta con tus temas y plugins
+# 1. Copiamos tu carpeta con tus temas y plugins
 COPY ./wp-content /var/www/html/wp-content
 
-# 3. Le damos permisos a WordPress para que pueda leer y escribir en tus archivos
+# 2. Ajustamos los permisos para que WordPress funcione bien
 RUN chown -R www-data:www-data /var/www/html/wp-content
+
+# 3. El truco maestro: Interceptar el arranque de Apache
+RUN mv /usr/local/bin/apache2-foreground /usr/local/bin/apache2-foreground-orig && \
+    echo '#!/bin/bash' > /usr/local/bin/apache2-foreground && \
+    echo 'a2dismod mpm_event mpm_worker 2>/dev/null || true' >> /usr/local/bin/apache2-foreground && \
+    echo 'a2enmod mpm_prefork 2>/dev/null || true' >> /usr/local/bin/apache2-foreground && \
+    echo 'exec apache2-foreground-orig "$@"' >> /usr/local/bin/apache2-foreground && \
+    chmod +x /usr/local/bin/apache2-foreground
